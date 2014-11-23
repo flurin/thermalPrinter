@@ -19,9 +19,9 @@ var verifyCommand = function(expected, commandName, param, done) {
 		if(param instanceof Array){
 			printer[commandName].apply(printer, param);
 		} else {
-			printer[commandName](param);	
+			printer[commandName](param);
 		}
-		
+
 		printer.commandQueue.length.should.equal(expected.length);
 		for (var i = 0; i < expected.length; i++) {
 			printer.commandQueue[i].should.be.instanceOf(Buffer);
@@ -192,12 +192,12 @@ describe('Printer', function() {
 		it('should add the right commands in the queue when setting underline to 0', function(done) {
 			var expected = [27, 45, 0];
 			verifyCommand(expected, 'underline', 0, done);
-		});	
+		});
 
 		it('should add the right commands in the queue when setting underline to 5', function(done) {
 			var expected = [27, 45, 5];
 			verifyCommand(expected, 'underline', 5, done);
-		});			
+		});
 	});
 
 	describe('Printer.inverse()', function() {
@@ -303,19 +303,20 @@ describe('Printer', function() {
 			var imgPath = __dirname + '/../images/schema.png';
 			var printer = new Printer(fakeSerialPort);
 			printer.on('ready', function() {
-				(function() {
-					printer.printImage(imgPath);
-				}).should.throw(Error);
-				done();
+				printer.printImage(imgPath, function(err){
+					err.should.be.instanceOf(Error);
+					done();
+				});
 			});
 		});
-		it('should throw an error because the image is larger than 384px', function(done) {
+		it('should print an image', function(done) {
 			var imgPath = __dirname + '/../images/testImg.png';
 			var printer = new Printer(fakeSerialPort);
 			printer.on('ready', function() {
-				printer.printImage(imgPath);
-				printer.commandQueue.length.should.equal(100);
-				done();
+				printer.printImage(imgPath, function(){
+					printer.commandQueue.length.should.equal(100);
+					done();
+				});
 			});
 		});
 	});
@@ -354,7 +355,7 @@ describe('Printer', function() {
 				}).should.throw(Error);
 				done();
 			});
-		});		
+		});
 	});
 
 	describe('Printer.barcodeHeight()', function() {
@@ -365,7 +366,7 @@ describe('Printer', function() {
 		it('should add the right commands in the queue on height 100', function(done) {
 			var expected = [29, 104, 100];
 			verifyCommand(expected, 'barcodeHeight', 100, done);
-		});	
+		});
 		it('should throw an error on height > 255', function(done) {
 			var printer = new Printer(fakeSerialPort);
 			printer.on('ready', function() {
@@ -374,7 +375,7 @@ describe('Printer', function() {
 				}).should.throw(Error);
 				done();
 			});
-		});	
+		});
 		it('should throw an error on height < 0', function(done) {
 			var printer = new Printer(fakeSerialPort);
 			printer.on('ready', function() {
@@ -383,7 +384,7 @@ describe('Printer', function() {
 				}).should.throw(Error);
 				done();
 			});
-		});	
+		});
 	});
 
 	describe('Printer.barcode()', function(){
@@ -403,12 +404,12 @@ describe('Printer', function() {
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 11', function(done){
-				var data = '0123456789';				
+				var data = '0123456789';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['a','A','+'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not numbers', function(done){
-					var data = '0123456789' + v;				
+					var data = '0123456789' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
@@ -426,16 +427,16 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  > 12', function(done){
-				var data = '0123456789011';				
+				var data = '0123456789011';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 11', function(done){
-				var data = '0123456789';				
+				var data = '0123456789';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['a','A','+'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not numbers', function(done){
-					var data = '0123456789' + v;				
+					var data = '0123456789' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
@@ -453,16 +454,16 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  > 13', function(done){
-				var data = '01234567890123';				
+				var data = '01234567890123';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 12', function(done){
-				var data = '01234567890';				
+				var data = '01234567890';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['a','A','+'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not numbers', function(done){
-					var data = '01234567890' + v;				
+					var data = '01234567890' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
@@ -480,16 +481,16 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  > 8', function(done){
-				var data = '012345678';				
+				var data = '012345678';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 7', function(done){
-				var data = '012345';				
+				var data = '012345';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['a','A','+'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not numbers', function(done){
-					var data = '012345' + v;				
+					var data = '012345' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
@@ -508,12 +509,12 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 1', function(done){
-				var data = '0';				
+				var data = '0';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['a','!','é'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are invalid', function(done){
-					var data = '0' + v;				
+					var data = '0' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
@@ -531,20 +532,20 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 1', function(done){
-				var data = '0';				
+				var data = '0';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  not even', function(done){
-				var data = '012';				
+				var data = '012';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['a','A','+'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not numbers', function(done){
-					var data = '0' + v;				
+					var data = '0' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
-		});		
+		});
 
 		describe('type CODEBAR', function(){
 			beforeEach(function(){
@@ -558,16 +559,16 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 1', function(done){
-				var data = '0';				
+				var data = '0';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['?','Z'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not valid', function(done){
-					var data = '0' + v;				
+					var data = '0' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
-		});		
+		});
 
 		describe('type CODE93', function(){
 			beforeEach(function(){
@@ -581,16 +582,16 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 1', function(done){
-				var data = '0';				
+				var data = '0';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['€','™'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not ASCII', function(done){
-					var data = '0' + v;				
+					var data = '0' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
-		});	
+		});
 
 		describe('type CODE128', function(){
 			beforeEach(function(){
@@ -604,16 +605,16 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 1', function(done){
-				var data = '0';				
+				var data = '0';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['€','™'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not ASCII', function(done){
-					var data = '0' + v;				
+					var data = '0' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
-		});	
+		});
 
 		describe('type CODE11', function(){
 			beforeEach(function(){
@@ -627,16 +628,16 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 1', function(done){
-				var data = '0';				
+				var data = '0';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['a','A','+'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not numbers', function(done){
-					var data = '0' + v;				
+					var data = '0' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
-		});		
+		});
 
 		describe('type MSI', function(){
 			beforeEach(function(){
@@ -650,15 +651,15 @@ describe('Printer', function() {
 				verifyCommand(expected, 'barcode', [this.type, data], done);
 			});
 			it('should throw an "invalid_data_size" error if data length is  < 1', function(done){
-				var data = '0';				
+				var data = '0';
 				verifyBarcodeError(this.type, data, 'invalid_data_size', done);
 			});
 			['a','A','+'].forEach(function(v){
 				it('should throw an "invalid_character" error if data characters are not numbers', function(done){
-					var data = '0' + v;				
+					var data = '0' + v;
 					verifyBarcodeError(this.type, data, 'invalid_character', done);
 				});
 			});
-		});		
+		});
 	});
 });
