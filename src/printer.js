@@ -1,12 +1,8 @@
 'use strict';
 var util = require('util'),
 	EventEmitter = require('events').EventEmitter,
-	fs = require('fs'),
-	Canvas = require('canvas'),
-	Image = Canvas.Image,
 	async = require('async'),
-	sleep = require('sleep'),
-	helpers = require('./helpers');
+	sleep = require('sleep');
 
 /*
  * Printer opts.
@@ -139,12 +135,12 @@ Printer.prototype.underline = function(dots){
 
 Printer.prototype.small = function(onOff){
   var commands = [27, 33, (onOff === true ? 1 : 0)];
-  return this.writeCommands(commands);  
+  return this.writeCommands(commands);
 };
 
 Printer.prototype.upsideDown = function(onOff){
   var commands = [27, 123, (onOff === true ? 1 : 0)];
-  return this.writeCommands(commands);  
+  return this.writeCommands(commands);
 };
 
 Printer.prototype.inverse = function (onOff) {
@@ -199,188 +195,10 @@ Printer.prototype.printLine = function (text) {
 	return this.writeCommands(commands);
 };
 
-Printer.prototype.printImage = function(path) {
-	// put the image in the canvas
-	var file = fs.readFileSync(path);
-	var img = new Image();
-	img.src = file;
-	if (img.width != 384 || img.height > 65635) {
-		throw new Error('Image width must be 384px, height cannot exceed 65635px.');
-	}
-	var canvas = new Canvas(img.width, img.height);
-	var ctx = canvas.getContext('2d');
-	ctx.drawImage(img, 0, 0, img.width, img.height);
-	var pixels = ctx.getImageData(0, 0, img.width, img.height).data;
 
-	// contruct an array of Uint8Array,
-	// each Uint8Array contains 384/8 pixel samples, corresponding to a whole line
-	var imgData = [];
-	for (var y = 0; y < img.height; y++) {
-		imgData[y] = new Uint8Array(img.width/8);
-		for (var x = 0; x < (img.width/8); x++) {
-			imgData[y][x] = 0;
-			for (var n = 0; n < 8; n++) {
-				var pixel = ctx.getImageData(x*8+n, y, 1, 1).data;
-				var brightness = helpers.rgbToHsl(pixel[0], pixel[1], pixel[2])[2];
-				// only print dark stuff
-				if (brightness < 0.6) {
-					imgData[y][x] += (1 << n);
-				}
-			}
-		}
-	}
+// Split methods into separate files. Not the nicest solution but it works
+require('./lib/barcode')(Printer);
+require('./lib/image')(Printer);
 
-	// send the commands and buffers to the printer
-	var commands = [18, 118, img.height & 255, img.height >> 8];
-	for (y = 0; y < imgData.length; y++) {
-		var buf = helpers.uint8ArrayToBuffer(imgData[y]);
-		commands.push.apply(commands, buf);
-	}
-	this.writeCommands(commands);
-	return this;
-};
-
-// Barcodes
-
-// Set barcodeTextPosition
-//
-// Position can be:
-// 0: Not printed
-// 1: Above the barcode
-// 2: Below the barcode
-// 3: Both above and below the barcode
-Printer.prototype.barcodeTextPosition = function(pos){
-	var error;
-
-  if(pos > 3 || pos < 0){
-  	throw new Error('Position must be 0, 1, 2 or 3');
-  }
-
-  var commands = [29, 72, pos];
-  return this.writeCommands(commands);
-};
-
-// Set barcode height
-// 0 < h < 255 (default = 50)
-Printer.prototype.barcodeHeight = function(h){
-  if(h > 255 || h < 0){
-    throw new Error('Height must be 0 < height > 255');
-  }
-
-  var commands = [29, 104, h];
-  return this.writeCommands(commands);
-};
-
-Printer.BARCODE_CHARSETS = {
-  NUMS: function(n){ return n >= 48 && n <= 57; },
-  ASCII: function(n){ return n >= 0 && n <= 127; }
-};
-
-// These are all valid barcode types.
-// Pass this object to printer.barcode() as type:
-// 		printer.barcode(Printer.BARCODE_TYPES.UPCA, "data");
-Printer.BARCODE_TYPES = {
-  UPCA : {
-    code: 65,
-    size: function(n){ return n == 11 || n == 12; },
-    chars: Printer.BARCODE_CHARSETS.NUMS
-  },
-  UPCE : {
-    code: 66,
-    size: function(n){ return n == 11 || n == 12; },
-    chars: Printer.BARCODE_CHARSETS.NUMS
-  },
-  EAN13 : {
-    code: 67,
-    size: function(n){ return n == 12 || n == 13; },
-    chars: Printer.BARCODE_CHARSETS.NUMS
-  },
-  EAN8 : {
-    code: 68,
-    size: function(n){ return n == 7 || n == 8; },
-    chars: Printer.BARCODE_CHARSETS.NUMS
-  },
-  CODE39 : {
-    code: 69,
-    size: function(n){ return n > 1; },
-    chars: function(n){ 
-      // " $%+-./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-      return (
-        n == 32 ||
-        n == 36 ||
-        n == 37 ||
-        n == 43 ||
-        (n >= 45 && n <= 57) ||
-        (n >= 65 && n <= 90)
-      );
-     } 
-  },
-  I25 : {
-    code: 70,
-    size: function(n){ return n > 1 && n % 2 === 0; },
-    chars: Printer.BARCODE_CHARSETS.NUMS
-  },
-  CODEBAR : {
-    code: 71,
-    size: function(n){ return n > 1; },
-    chars: function(n){ 
-    	// "$+-./0123456789:ABCD"
-      return (
-        n == 36 ||
-        n == 43 ||
-        (n >= 45 && n <= 58) ||
-        (n >= 65 && n <= 68)
-      );
-     } 
-  },
-  CODE93 : {
-    code: 72,
-    size: function(n){ return n > 1; },
-    chars: Printer.BARCODE_CHARSETS.ASCII
-  },
-  CODE128 : {
-    code: 73,
-    size: function(n){ return n > 1; },
-    chars: Printer.BARCODE_CHARSETS.ASCII
-  },
-  CODE11 : {
-    code: 74,
-    size: function(n){ return n > 1; },
-    chars: Printer.BARCODE_CHARSETS.NUMS
-  },
-  MSI : {
-    code: 75,
-    size: function(n){ return n > 1; },
-    chars: Printer.BARCODE_CHARSETS.NUMS
-  }
-};
-
-Printer.prototype.barcode = function(type, data){
-	var error;
-  var commands = [29, 107];
-  commands.push(type.code);
-  commands.push(data.length);
-
-  // Validate size
-  if(!type.size(data.length)){
-  	error = new Error('Data length does not match specification for this type of barcode');
-  	error.name = "invalid_data_size";
-    throw error;
-  }
-
-  for(var i=0; i < data.length; i++){
-    var code = data.charCodeAt(i);  
-    if(!type.chars(code)){
-    	error = new Error('Character ' + code + ' is not valid for this type of barcode');
-    	error.name = "invalid_character";
-    	error.char = code;
-      throw error;
-    }
-
-    commands.push(code);
-  }
-
-  return this.writeCommands(commands);
-};
 
 module.exports = Printer;

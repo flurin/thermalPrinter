@@ -1,7 +1,7 @@
 'use strict';
 /*jshint expr: true*/
 var should = require('chai').should(),
-	Helpers = require('../src/helpers');
+	Helpers = require('../src/lib/helpers');
 
 describe('Helpers', function() {
 
