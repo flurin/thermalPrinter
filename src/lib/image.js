@@ -1,5 +1,7 @@
 var fs = require('fs'),
   getPixels = require('get-pixels'),
+  ndarray = require('ndarray'),
+  ndarrayOps = require('ndarray-ops'),
   helpers = require('./helpers');
 
 module.exports = function(Printer){
@@ -21,47 +23,81 @@ module.exports = function(Printer){
     }
   }
 
+  // Make an empty white image
+  var createWhiteImage = function(w,h){
+    var shape = [w,h,4];
+
+    var result = ndarray(new Uint8Array(shape[0] * shape[1] * shape[2]), shape);
+
+    ndarrayOps.assigns(result, 255);
+
+    return result;
+  }
+
   // cb = generic callback object, first parameter is an error
-  Printer.prototype.printImage = function(path, cb){
+  // position = "left", "center", "right" default = "center"
+  Printer.prototype.printImage = function(path, position, cb){
+    if(arguments.length == 2){
+      cb = arguments[1];
+      position = "center";
+    }
+
     getPixels(path, function(err, pixels){
-      if(!err){
-        var width = pixels.shape[0];
-        var height = pixels.shape[1];
+      if(err && cb){
+        return cb(new Error(err));
+      }
 
-        if (width != 384 || height > 65635) {
-          return cb(new Error('Image width must be 384px, height cannot exceed 65635px.'));
+      var width = pixels.shape[0];
+      var height = pixels.shape[1];
+
+      if (width > 384 || height > 65635) {
+        return cb(new Error('Image width must not exceed 384px, height cannot exceed 65635px.'));
+      }
+
+      if (width < 384){
+        var white = createWhiteImage(384, height);
+        var dx;
+        if(position == "left"){
+          dx = 0;
+        } else if (position == "right"){
+          dx = white.shape[0] - pixels.shape[0];
+        } else {
+          dx = Math.floor((white.shape[0] - pixels.shape[0])/2);
         }
+        var cutout = white.lo(dx,0).hi(pixels.shape[0], pixels.shape[1]);
+        ops.assign(cutout, pixels);
 
-        // contruct an array of Uint8Array,
-        // each Uint8Array contains 384/8 pixel samples, corresponding to a whole line
-        var imgData = [];
-        for (var y = 0; y < height; y++) {
-          imgData[y] = new Uint8Array(width/8);
-          for (var x = 0; x < (width/8); x++) {
-            imgData[y][x] = 0;
-            for (var n = 0; n < 8; n++) {
-              var r = pixels.get(x*8+n, y, 0);
-              var g = pixels.get(x*8+n, y, 1);
-              var b = pixels.get(x*8+n, y, 2);
+        // Reassign pixels
+        pixels = cutout
+        width = pixels.shape[0];
+      }
 
-              var brightness = helpers.rgbToHsl(r, g, b)[2];
-              // only print dark stuff
-              if (brightness < 0.6) {
-                imgData[y][x] += (1 << n);
-              }
+      // contruct an array of Uint8Array,
+      // each Uint8Array contains 384/8 pixel samples, corresponding to a whole line
+      var imgData = [];
+      for (var y = 0; y < height; y++) {
+        imgData[y] = new Uint8Array(width/8);
+        for (var x = 0; x < (width/8); x++) {
+          imgData[y][x] = 0;
+          for (var n = 0; n < 8; n++) {
+            var r = pixels.get(x*8+n, y, 0);
+            var g = pixels.get(x*8+n, y, 1);
+            var b = pixels.get(x*8+n, y, 2);
+
+            var brightness = helpers.rgbToHsl(r, g, b)[2];
+            // only print dark stuff
+            if (brightness < 0.6) {
+              imgData[y][x] += (1 << n);
             }
           }
         }
+      }
 
-        // send the commands and buffers to the printer
-        this.printImageData(width, height, imgData);
+      // send the commands and buffers to the printer
+      this.printImageData(width, height, imgData);
 
-        if(cb){
-          return cb(null);
-        }
-
-      } else {
-        return cb(new Error(err));
+      if(cb){
+        return cb(null);
       }
     }.bind(this))
   }
